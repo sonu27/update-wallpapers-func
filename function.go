@@ -14,9 +14,11 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
+	vision "cloud.google.com/go/vision/apiv1"
 	firebase "firebase.google.com/go"
 	"github.com/mitchellh/mapstructure"
 	"google.golang.org/api/option"
+	vision2 "google.golang.org/genproto/googleapis/cloud/vision/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -28,6 +30,9 @@ const (
 )
 
 var (
+	annoClient      *vision.ImageAnnotatorClient
+	firestoreClient *firestore.Client
+
 	ENMarkets = []string{
 		"en-ww",
 		"en-gb",
@@ -44,7 +49,7 @@ type PubSubMessage struct {
 	Data []byte `json:"data"`
 }
 
-func UpdateWallpapers(ctx context.Context, m PubSubMessage) error {
+func HelloPubSub(ctx context.Context, m PubSubMessage) error {
 	Start(ctx)
 	return nil
 }
@@ -57,11 +62,10 @@ func Start(ctx context.Context) {
 		panic(err)
 	}
 
-	firestoreClient, err := app.Firestore(ctx)
+	firestoreClient, err = app.Firestore(ctx)
 	if err != nil {
 		panic(err)
 	}
-	defer firestoreClient.Close()
 
 	storageClient, err := app.Storage(ctx)
 	if err != nil {
@@ -69,6 +73,11 @@ func Start(ctx context.Context) {
 	}
 
 	bucket, err := storageClient.Bucket(bucketName)
+	if err != nil {
+		panic(err)
+	}
+
+	annoClient, err = vision.NewImageAnnotatorClient(ctx, sa)
 	if err != nil {
 		panic(err)
 	}
@@ -123,10 +132,6 @@ func Start(ctx context.Context) {
 		}
 		//fmt.Printf("%+v\n", v)
 		dsnap, err := firestoreClient.Collection(firestoreCollection).Doc(v.ID).Get(ctx)
-		if err != nil {
-			//fmt.Println(err.Error())
-		}
-
 		if status.Code(err) == codes.NotFound {
 			fmt.Println("not found")
 		}
@@ -151,9 +156,36 @@ func Start(ctx context.Context) {
 		inrec, _ := json.Marshal(v)
 		json.Unmarshal(inrec, &wallpaper)
 
-		_, err = firestoreClient.Collection(firestoreCollection).Doc(v.ID).Set(ctx, wallpaper, firestore.MergeAll)
+		_, err = updateWallpaper(ctx, v.ID, wallpaper)
 		if err != nil {
 			log.Fatalf("Failed adding: %v", err)
+		}
+
+		if !dsnap.Exists() {
+			err, anno := detectLabels(sa, v.ThumbURL)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+
+			var annotations []map[string]interface{}
+
+			b, err := json.Marshal(&anno)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			err = json.Unmarshal(b, &annotations)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+
+			gg := map[string]interface{}{
+				"labelAnnotations": annotations,
+			}
+
+			_, err = updateWallpaper(ctx, v.ID, gg)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 		}
 	}
 }
@@ -256,6 +288,30 @@ func downloadFile(ctx context.Context, bucket *storage.BucketHandle, url string,
 		fmt.Println(err.Error())
 	}
 	objWriter.Close()
+}
+
+func updateWallpaper(ctx context.Context, ID string, data map[string]interface{}) (*firestore.WriteResult, error) {
+	return firestoreClient.Collection(firestoreCollection).Doc(ID).Set(ctx, data, firestore.MergeAll)
+}
+
+func detectLabels(opt option.ClientOption, url string) (error, []*vision2.EntityAnnotation) {
+	ctx := context.Background()
+
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	client := http.DefaultClient
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	image, err := vision.NewImageFromReader(resp.Body)
+	if err != nil {
+		return err, nil
+	}
+	annotations, err := annoClient.DetectLabels(ctx, image, nil, 50)
+	if err != nil {
+		return err, nil
+	}
+
+	return nil, annotations
 }
 
 func stringInSlice(a string, list []string) bool {

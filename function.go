@@ -37,9 +37,13 @@ var (
 		"en-ww",
 		"en-gb",
 		"en-us",
+		"en-ca",
+		"en-au",
 	}
 
 	nonENMarkets = []string{
+		"fr-fr",
+		"de-de",
 		"zh-cn",
 		"ja-JP",
 	}

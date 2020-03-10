@@ -242,16 +242,20 @@ func convertToImage(bw BingImage, market string) (*Image, error) {
 
 	var copyright string
 	var title string
-	a := strings.Split(bw.Copyright, "(")
-	if len(a) != 2 {
-		// failed because of chinese chars
-		s := strings.Split(bw.Copyright, "（")
-		title = s[0]
-		copyright = s[1]
-		copyright = strings.Replace(copyright, "）", "", 1)
-	} else {
+
+	if a := strings.Split(bw.Copyright, "（©"); len(a) == 2 {
+		// chinese chars
 		title = a[0]
-		copyright = a[1]
+		copyright = "© " + a[1]
+		copyright = strings.Replace(copyright, "）", "", 1)
+	} else if a := strings.Split(bw.Copyright, "(©"); len(a) == 2 {
+		title = a[0]
+		copyright = "© " + a[1]
+		copyright = strings.Replace(copyright, ")", "", 1)
+	} else {
+		a := strings.Split(bw.Copyright, "©")
+		title = a[0]
+		copyright = "© " + a[1]
 		copyright = strings.Replace(copyright, ")", "", 1)
 	}
 	title = strings.TrimSpace(title)

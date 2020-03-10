@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/firestore v1.1.1
 	cloud.google.com/go/storage v1.5.0
 	firebase.google.com/go v3.12.0+incompatible
+	github.com/joho/godotenv v1.3.0
 	github.com/mitchellh/mapstructure v1.1.2
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb

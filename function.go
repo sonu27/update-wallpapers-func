@@ -13,9 +13,11 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
+	"cloud.google.com/go/translate"
 	vision "cloud.google.com/go/vision/apiv1"
 	firebase "firebase.google.com/go"
 	"github.com/mitchellh/mapstructure"
+	"golang.org/x/text/language"
 	"google.golang.org/api/option"
 	vision2 "google.golang.org/genproto/googleapis/cloud/vision/v1"
 	"google.golang.org/grpc/codes"
@@ -31,6 +33,7 @@ const (
 var (
 	annoClient      *vision.ImageAnnotatorClient
 	firestoreClient *firestore.Client
+	translateClient *translate.Client
 
 	ENMarkets = []string{
 		"en-ww",
@@ -80,6 +83,11 @@ func Start(ctx context.Context) error {
 	}
 
 	annoClient, err = vision.NewImageAnnotatorClient(ctx, sa)
+	if err != nil {
+		return err
+	}
+
+	translateClient, err = translate.NewClient(ctx, sa)
 	if err != nil {
 		return err
 	}
@@ -152,6 +160,15 @@ func Start(ctx context.Context) error {
 
 		downloadFile(ctx, bucket, v.URL, v.Filename+".jpg")
 		downloadFile(ctx, bucket, v.ThumbURL, v.Filename+"_th.jpg")
+
+		if stringInSlice(v.Market, nonENMarkets) {
+			translatedTitle, err := translateText(context.Background(), v.Title)
+			if err != nil {
+				fmt.Println(err.Error())
+			} else if translatedTitle != "" {
+				v.Title = translatedTitle
+			}
+		}
 
 		var wallpaper map[string]interface{}
 		inrec, _ := json.Marshal(v)
@@ -258,6 +275,7 @@ func convertToImage(bw BingImage, market string) (*Image, error) {
 		copyright = "© " + a[1]
 		copyright = strings.Replace(copyright, ")", "", 1)
 	}
+
 	title = strings.TrimSpace(title)
 	copyright = strings.TrimSpace(copyright)
 
@@ -274,6 +292,22 @@ func convertToImage(bw BingImage, market string) (*Image, error) {
 	}
 
 	return image, nil
+}
+
+func translateText(ctx context.Context, text string) (string, error) {
+	lang, _ := language.Parse("en")
+	opts := &translate.Options{
+		Format: "text",
+	}
+	resp, err := translateClient.Translate(ctx, []string{text}, lang, opts)
+	if err != nil {
+		return "", fmt.Errorf("translate: %v", err)
+	}
+	if len(resp) == 0 {
+		return "", fmt.Errorf("translate returned empty response to text: %s", text)
+	}
+
+	return resp[0].Text, nil
 }
 
 func fileExists(url string) bool {

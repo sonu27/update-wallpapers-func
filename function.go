@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -54,40 +53,39 @@ type PubSubMessage struct {
 }
 
 func HelloPubSub(ctx context.Context, m PubSubMessage) error {
-	Start(ctx)
-	return nil
+	return Start(ctx)
 }
 
-func Start(ctx context.Context) {
+func Start(ctx context.Context) error {
 	saJSON, _ := base64.StdEncoding.DecodeString(os.Getenv("FIRESTORE_SA"))
 	sa := option.WithCredentialsJSON(saJSON)
 	app, err := firebase.NewApp(ctx, nil, sa)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	firestoreClient, err = app.Firestore(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	storageClient, err := app.Storage(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	bucket, err := storageClient.Bucket(bucketName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	annoClient, err = vision.NewImageAnnotatorClient(ctx, sa)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if _, err = bucket.Attrs(ctx); err != nil {
-		panic(err)
+		return err
 	}
 
 	wallpapers := make(map[string]Image)
@@ -95,13 +93,13 @@ func Start(ctx context.Context) {
 	for _, market := range ENMarkets {
 		bw, err := getData(market)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		for _, v := range bw.Images {
 			image, err := convertToImage(v, market)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			if _, exists := wallpapers[image.ID]; !exists {
@@ -113,13 +111,13 @@ func Start(ctx context.Context) {
 	for _, market := range nonENMarkets {
 		bw, err := getData(market)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		for _, v := range bw.Images {
 			image, err := convertToImage(v, market)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			if _, exists := wallpapers[image.ID]; !exists {
@@ -129,7 +127,7 @@ func Start(ctx context.Context) {
 	}
 
 	// for each wallpaper, check if exists in db
-	fmt.Println(len(wallpapers))
+	fmt.Printf("%d wallpapers found\n", len(wallpapers))
 	for _, v := range wallpapers {
 		if !fileExists(v.URL) {
 			continue
@@ -137,16 +135,15 @@ func Start(ctx context.Context) {
 		//fmt.Printf("%+v\n", v)
 		dsnap, err := firestoreClient.Collection(firestoreCollection).Doc(v.ID).Get(ctx)
 		if status.Code(err) == codes.NotFound {
-			fmt.Println("not found")
+			fmt.Printf("%s not found\n", v.ID)
 		}
 
 		if dsnap.Exists() {
-			data := dsnap.Data()
-
 			var result Image
-			mapstructure.Decode(data, &result)
+			mapstructure.Decode(dsnap.Data(), &result)
 
 			if stringInSlice(result.Market, nonENMarkets) && stringInSlice(v.Market, ENMarkets) {
+				// maintain old date
 				v.Date = result.Date
 			} else {
 				continue
@@ -162,21 +159,22 @@ func Start(ctx context.Context) {
 
 		_, err = updateWallpaper(ctx, v.ID, wallpaper)
 		if err != nil {
-			log.Fatalf("Failed adding: %v", err)
+			return err
 		}
 
+		// add extras info e.g. labels
 		if !dsnap.Exists() {
-			err, anno := detectLabels(sa, v.ThumbURL)
+			err, anno := detectLabels(v.ThumbURL)
 			if err != nil {
 				fmt.Println(err.Error())
 			}
-
-			var annotations []map[string]interface{}
 
 			b, err := json.Marshal(&anno)
 			if err != nil {
 				fmt.Println(err.Error())
 			}
+
+			var annotations []map[string]interface{}
 			err = json.Unmarshal(b, &annotations)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -192,6 +190,8 @@ func Start(ctx context.Context) {
 			}
 		}
 	}
+
+	return nil
 }
 
 type BingWallpapers struct {
@@ -302,7 +302,7 @@ func updateWallpaper(ctx context.Context, ID string, data map[string]interface{}
 	return firestoreClient.Collection(firestoreCollection).Doc(ID).Set(ctx, data, firestore.MergeAll)
 }
 
-func detectLabels(opt option.ClientOption, url string) (error, []*vision2.EntityAnnotation) {
+func detectLabels(url string) (error, []*vision2.EntityAnnotation) {
 	ctx := context.Background()
 
 	req, _ := http.NewRequest(http.MethodGet, url, nil)

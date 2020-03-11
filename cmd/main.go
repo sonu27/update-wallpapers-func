@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	p "sonurai"
 
 	"github.com/joho/godotenv"
@@ -14,5 +15,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	p.Start(ctx)
+	if err := p.Start(ctx); err != nil {
+		log.Fatal(err)
+	}
 }

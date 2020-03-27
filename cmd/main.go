@@ -15,7 +15,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	if err := p.Start(ctx); err != nil {
+	if err := p.Trans(ctx); err != nil {
 		log.Fatal(err)
 	}
 }

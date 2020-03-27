@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -57,6 +60,67 @@ type PubSubMessage struct {
 
 func HelloPubSub(ctx context.Context, m PubSubMessage) error {
 	return Start(ctx)
+}
+
+func Trans(ctx context.Context) error {
+	saJSON, _ := base64.StdEncoding.DecodeString(os.Getenv("FIRESTORE_SA"))
+	sa := option.WithCredentialsJSON(saJSON)
+	app, err := firebase.NewApp(ctx, nil, sa)
+	if err != nil {
+		return err
+	}
+
+	firestoreClient, err = app.Firestore(ctx)
+	if err != nil {
+		return err
+	}
+
+	translateClient, err = translate.NewClient(ctx, sa)
+	if err != nil {
+		return err
+	}
+
+	iter := firestoreClient.Collection(firestoreCollection).
+		Where("market", "==", "zh-cn").
+		Limit(1000).Documents(ctx)
+	i := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Failed to iterate: %v", err)
+		}
+		i++
+		fmt.Print(i)
+		fmt.Print(" ")
+
+		data := doc.Data()
+		fmt.Println(data)
+
+		id := data["id"].(string)
+		title := data["title"].(string)
+
+		translatedTitle, err := translateText(ctx, title)
+		if err != nil {
+			fmt.Println(err.Error())
+		} else if translatedTitle != "" {
+			title = translatedTitle
+		}
+
+		gg := map[string]interface{}{
+			"title":      title,
+			"translated": true,
+		}
+
+		_, err = updateWallpaper(ctx, id, gg)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
+
+	return nil
 }
 
 func Start(ctx context.Context) error {

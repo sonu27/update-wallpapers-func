@@ -56,10 +56,6 @@ type PubSubMessage struct {
 }
 
 func HelloPubSub(ctx context.Context, m PubSubMessage) error {
-	return Start(ctx)
-}
-
-func Start(ctx context.Context) error {
 	saJSON, _ := base64.StdEncoding.DecodeString(os.Getenv("FIRESTORE_SA"))
 	sa := option.WithCredentialsJSON(saJSON)
 	app, err := firebase.NewApp(ctx, nil, sa)
@@ -82,6 +78,10 @@ func Start(ctx context.Context) error {
 		return err
 	}
 
+	if _, err = bucket.Attrs(ctx); err != nil {
+		return err
+	}
+
 	annoClient, err = vision.NewImageAnnotatorClient(ctx, sa)
 	if err != nil {
 		return err
@@ -92,46 +92,19 @@ func Start(ctx context.Context) error {
 		return err
 	}
 
-	if _, err = bucket.Attrs(ctx); err != nil {
+	return Start(ctx, bucket)
+}
+
+func Start(ctx context.Context, bucket *storage.BucketHandle) error {
+	var updatedWallpapers []string
+
+	// fetch and add wallpapers to the map if they do not exist
+	wallpapers := make(map[string]Image)
+	if err := addWallpapers(ENMarkets, wallpapers); err != nil {
 		return err
 	}
-
-	wallpapers := make(map[string]Image)
-
-	for _, market := range ENMarkets {
-		bw, err := getData(market)
-		if err != nil {
-			return err
-		}
-
-		for _, v := range bw.Images {
-			image, err := convertToImage(v, market)
-			if err != nil {
-				return err
-			}
-
-			if _, exists := wallpapers[image.ID]; !exists {
-				wallpapers[image.ID] = *image
-			}
-		}
-	}
-
-	for _, market := range nonENMarkets {
-		bw, err := getData(market)
-		if err != nil {
-			return err
-		}
-
-		for _, v := range bw.Images {
-			image, err := convertToImage(v, market)
-			if err != nil {
-				return err
-			}
-
-			if _, exists := wallpapers[image.ID]; !exists {
-				wallpapers[image.ID] = *image
-			}
-		}
+	if err := addWallpapers(nonENMarkets, wallpapers); err != nil {
+		return err
 	}
 
 	// for each wallpaper, check if exists in db
@@ -178,6 +151,7 @@ func Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		updatedWallpapers = append(updatedWallpapers, v.ID)
 
 		// add extras info e.g. labels
 		if !dsnap.Exists() {
@@ -208,6 +182,8 @@ func Start(ctx context.Context) error {
 		}
 	}
 
+	fmt.Printf("%d updated wallpapers %s\n", len(updatedWallpapers), strings.Join(updatedWallpapers, ", "))
+
 	return nil
 }
 
@@ -232,6 +208,27 @@ type Image struct {
 	FullDesc  string `json:"fullDesc"`
 	URL       string `json:"url"`
 	ThumbURL  string `json:"thumbUrl"`
+}
+
+func addWallpapers(markets []string, wallpapers map[string]Image) error {
+	for _, market := range markets {
+		bw, err := getData(market)
+		if err != nil {
+			return err
+		}
+
+		for _, v := range bw.Images {
+			image, err := convertToImage(v, market)
+			if err != nil {
+				return err
+			}
+
+			if _, exists := wallpapers[image.ID]; !exists {
+				wallpapers[image.ID] = *image
+			}
+		}
+	}
+	return nil
 }
 
 func getData(market string) (*BingWallpapers, error) {

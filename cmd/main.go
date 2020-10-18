@@ -15,7 +15,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	if err := p.Start(ctx); err != nil {
+	if err := p.HelloPubSub(ctx, p.PubSubMessage{}); err != nil {
 		log.Fatal(err)
 	}
 }

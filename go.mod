@@ -1,4 +1,4 @@
-module sonurai
+module github.com/sonu27/update-wallpapers-func
 
 go 1.13
 

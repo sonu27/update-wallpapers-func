@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	p "sonurai"
 
 	"github.com/joho/godotenv"
+	p "github.com/sonu27/update-wallpapers-func"
 )
 
 func main() {

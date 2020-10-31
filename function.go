@@ -116,7 +116,7 @@ func Start(ctx context.Context, bucket *storage.BucketHandle) error {
 		//fmt.Printf("%+v\n", v)
 		dsnap, err := firestoreClient.Collection(firestoreCollection).Doc(v.ID).Get(ctx)
 		if status.Code(err) == codes.NotFound {
-			fmt.Printf("%s not found\n", v.ID)
+			fmt.Printf("%s new wallpaper found\n", v.ID)
 		}
 
 		if dsnap.Exists() {

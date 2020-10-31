@@ -137,7 +137,7 @@ func Start(ctx context.Context, bucket *storage.BucketHandle) error {
 		if stringInSlice(v.Market, nonENMarkets) {
 			translatedTitle, err := translateText(context.Background(), v.Title)
 			if err != nil {
-				fmt.Println(err.Error())
+				return err
 			} else if translatedTitle != "" {
 				v.Title = translatedTitle
 			}

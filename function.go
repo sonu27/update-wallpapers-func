@@ -160,19 +160,13 @@ func Start(ctx context.Context, bucket *storage.BucketHandle) error {
 				fmt.Println(err.Error())
 			}
 
-			b, err := json.Marshal(&anno)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-
-			var annotations []map[string]interface{}
-			err = json.Unmarshal(b, &annotations)
-			if err != nil {
-				fmt.Println(err.Error())
+			tags := make(map[string]float32)
+			for _, v := range anno {
+				tags[v.Description] = v.Score
 			}
 
 			gg := map[string]interface{}{
-				"labelAnnotations": annotations,
+				"tags": tags,
 			}
 
 			_, err = updateWallpaper(ctx, v.ID, gg)

@@ -162,7 +162,7 @@ func Start(ctx context.Context, bucket *storage.BucketHandle) error {
 
 			tags := make(map[string]float32)
 			for _, v := range anno {
-				tags[v.Description] = v.Score
+				tags[strings.ToLower(v.Description)] = v.Score
 			}
 
 			gg := map[string]interface{}{

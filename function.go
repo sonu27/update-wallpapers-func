@@ -132,7 +132,6 @@ func Start(ctx context.Context, bucket *storage.BucketHandle) error {
 		}
 
 		downloadFile(ctx, bucket, v.URL, v.Filename+".jpg")
-		downloadFile(ctx, bucket, v.ThumbURL, v.Filename+"_th.jpg")
 
 		if stringInSlice(v.Market, nonENMarkets) {
 			translatedTitle, err := translateText(context.Background(), v.Title)

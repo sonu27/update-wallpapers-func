@@ -16,5 +16,6 @@ There is also splitting of the description to get the title and copyright.
 - Separate the functions into different packages and enable CI/CD. They were originally kept in one file for ease of deployment.
 - TEST!
 - Merge with API source code (maybe).
-- Use concurrency for making requests.
+- Use concurrency for making requests (maybe).
 - Download wallpaper even if large image is not found.
+- Use IAM roles instead of service account keys.

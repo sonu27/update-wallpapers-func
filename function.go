@@ -27,7 +27,7 @@ import (
 const (
 	bucketName          = "images.sonurai.com"
 	firestoreCollection = "BingWallpapers"
-	bingURL             = "http://www.bing.com"
+	bingURL             = "https://www.bing.com"
 )
 
 var (
@@ -36,16 +36,17 @@ var (
 	translateClient *translate.Client
 
 	ENMarkets = []string{
-		"en-ww",
 		"en-gb",
 		"en-us",
 		"en-ca",
 		"en-au",
+		"en-nz",
 	}
 
 	nonENMarkets = []string{
 		"fr-fr",
 		"de-de",
+		"es-es",
 		"zh-cn",
 		"ja-JP",
 	}
